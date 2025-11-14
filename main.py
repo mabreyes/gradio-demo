@@ -1,19 +1,23 @@
 """Main entry point for the Gradio chat application."""
 
+import logging
+
 from config.settings import settings
 from infrastructure.models.huggingface_adapter import HuggingFaceModelAdapter
 from presentation.gradio_interface import create_gradio_interface
 
+logger = logging.getLogger(__name__)
 
-def main():
-    """Main function to initialize and launch the application."""
-    print("Initializing model...")
+
+def main() -> None:
+    """Initialize dependencies and launch the Gradio application."""
+    logger.info("Initializing model...")
 
     # Initialize model provider (Infrastructure layer)
     model_provider = HuggingFaceModelAdapter(settings=settings)
     model_provider.initialize()
 
-    print("Creating Gradio interface...")
+    logger.info("Creating Gradio interface...")
 
     # Create Gradio interface (Presentation layer)
     gradio_interface = create_gradio_interface(
@@ -21,8 +25,11 @@ def main():
         settings=settings,
     )
 
-    print("Launching Gradio interface...")
-    print(f"Server: {settings.GRADIO_SERVER_NAME}:{settings.GRADIO_SERVER_PORT}")
+    logger.info(
+        "Launching Gradio interface on %s:%s",
+        settings.GRADIO_SERVER_NAME,
+        settings.GRADIO_SERVER_PORT,
+    )
 
     # Launch interface
     gradio_interface.launch()
