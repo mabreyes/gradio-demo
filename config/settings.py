@@ -17,12 +17,9 @@ class Settings:
     # - microsoft/Phi-2 (excellent quality, ~5GB)
     # - google/gemma-2b-it (good quality, ~5GB)
     MODEL_NAME: str = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-0.5B-Instruct")
-    MAX_LENGTH: int = int(os.getenv("MAX_LENGTH", "128"))  # Reduced for faster generation
+    MAX_LENGTH: int = int(os.getenv("MAX_LENGTH", "512"))
     TEMPERATURE: float = float(os.getenv("TEMPERATURE", "0.7"))
     USE_CHAT_TEMPLATE: bool = os.getenv("USE_CHAT_TEMPLATE", "True").lower() == "true"
-    MAX_INPUT_LENGTH: int = int(os.getenv("MAX_INPUT_LENGTH", "512"))  # Max input context
-    USE_QUANTIZATION: bool = os.getenv("USE_QUANTIZATION", "True").lower() == "true"  # INT8 quantization for CPU
-    USE_GREEDY_DECODING: bool = os.getenv("USE_GREEDY_DECODING", "False").lower() == "true"  # Faster, deterministic
     
     # Gradio configuration
     GRADIO_SERVER_NAME: str = os.getenv("GRADIO_SERVER_NAME", "0.0.0.0")
