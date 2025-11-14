@@ -1,6 +1,6 @@
 """Gradio interface (Presentation Layer - user interface)."""
 import gradio as gr
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Iterator
 from application.chat.chat_service import ChatService
 from domain.chat.interfaces import IModelProvider
 from config.settings import settings
@@ -26,8 +26,8 @@ class GradioChatInterface:
         history: List[Dict[str, str]], 
         temperature: float = None,
         max_tokens: int = None
-    ) -> Tuple[str, List[Dict[str, str]]]:
-        """Handle chat message and update history.
+    ) -> Iterator[Tuple[str, List[Dict[str, str]]]]:
+        """Handle chat message and update history with streaming.
         
         Args:
             message: User's message
@@ -35,26 +35,31 @@ class GradioChatInterface:
             temperature: Optional temperature override
             max_tokens: Optional max tokens override
             
-        Returns:
-            Tuple of (empty string, updated history)
+        Yields:
+            Tuple of (empty string, updated history) as response streams
         """
         if not message.strip():
-            return "", history
+            yield "", history
+            return
         
-        # Generate response with optional parameter overrides
-        response = self.chat_service.send_message(
+        # Add user message to history immediately
+        updated_history = history + [{"role": "user", "content": message}]
+        
+        # Initialize assistant message
+        assistant_message = {"role": "assistant", "content": ""}
+        updated_history = updated_history + [assistant_message]
+        
+        # Stream response tokens
+        accumulated_response = ""
+        for token in self.chat_service.send_message_stream(
             message,
             temperature=temperature,
             max_tokens=max_tokens
-        )
-        
-        # Update history with messages format (role and content)
-        updated_history = history + [
-            {"role": "user", "content": message},
-            {"role": "assistant", "content": response}
-        ]
-        
-        return "", updated_history
+        ):
+            accumulated_response += token
+            # Update the assistant message in history
+            updated_history[-1] = {"role": "assistant", "content": accumulated_response}
+            yield "", updated_history
     
     def _clear_history(self) -> Tuple[str, List]:
         """Clear conversation history.
@@ -166,20 +171,19 @@ class GradioChatInterface:
                 "</div>"
             )
             
-            # Event handlers
-            def chat_with_params(message, history, temp, max_tok):
-                return self._chat_function(message, history, temp, max_tok)
-            
+            # Event handlers with streaming support
             msg.submit(
-                chat_with_params,
+                self._chat_function,
                 inputs=[msg, chatbot, temperature_slider, max_tokens_slider],
-                outputs=[msg, chatbot]
+                outputs=[msg, chatbot],
+                show_progress="full"
             )
             
             submit_btn.click(
-                chat_with_params,
+                self._chat_function,
                 inputs=[msg, chatbot, temperature_slider, max_tokens_slider],
-                outputs=[msg, chatbot]
+                outputs=[msg, chatbot],
+                show_progress="full"
             )
             
             clear_btn.click(
