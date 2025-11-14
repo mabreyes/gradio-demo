@@ -1,6 +1,5 @@
 """Gradio interface (Presentation Layer - user interface)."""
 
-import re
 import time
 from typing import Dict, Iterator, List, Optional, Tuple
 
@@ -14,8 +13,6 @@ from domain.chat.interfaces import IModelProvider
 
 class GradioChatInterface:
     """Gradio chat interface following SRP - single responsibility for UI."""
-
-    _CODE_BLOCK_PATTERN = re.compile(r"```([^\n]*)\n(.*?)(```)", re.DOTALL)
 
     def __init__(
         self,
@@ -34,42 +31,6 @@ class GradioChatInterface:
         self.model_provider = model_provider
         self.settings = settings
         self.interface = None
-
-    @staticmethod
-    def _guess_code_language(code: str) -> str:
-        """Best-effort guess of code language for syntax highlighting."""
-        snippet = code.lower()
-        if "public class" in code or "system.out" in snippet or "static void main" in snippet:
-            return "java"
-        if "def " in snippet or "import " in snippet or "print(" in snippet:
-            return "python"
-        if "#include" in snippet or "int main(" in snippet:
-            return "cpp"
-        if "<?php" in snippet:
-            return "php"
-        if "console.log" in snippet or "document." in snippet or "function " in snippet:
-            return "javascript"
-        return ""
-
-    @classmethod
-    def _normalize_code_blocks(cls, text: str) -> str:
-        """Ensure fenced code blocks have a language for syntax highlighting."""
-
-        def _replace(match: re.Match) -> str:
-            lang = match.group(1).strip()
-            code = match.group(2)
-
-            # If language is already specified, keep as-is
-            if lang:
-                return match.group(0)
-
-            guessed = cls._guess_code_language(code)
-            if not guessed:
-                guessed = "text"
-
-            return f"```{guessed}\n{code}```"
-
-        return cls._CODE_BLOCK_PATTERN.sub(_replace, text)
 
     def _chat_function(
         self,
@@ -118,10 +79,9 @@ class GradioChatInterface:
 
         # Final update without the cursor once generation is complete
         if updated_history and updated_history[-1]["role"] == "assistant":
-            normalized = self._normalize_code_blocks(accumulated_response)
             updated_history[-1] = {
                 "role": "assistant",
-                "content": normalized,
+                "content": accumulated_response,
             }
             yield "", updated_history
 

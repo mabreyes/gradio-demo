@@ -18,23 +18,9 @@ SPECIAL_TOKENS_TO_STRIP = ("<|endoftext|>", "<|im_end|>", "<|im_start|>")
 DEFAULT_EMPTY_RESPONSE = "I'm sorry, I couldn't generate a response. Please try again."
 ENGLISH_SYSTEM_PROMPT = (
     "You are a helpful AI assistant. "
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
     "Always respond in English, even if the user writes in another language. "
     "When you include code, format it using Markdown fenced code blocks "
-    "with the appropriate language tag (for example ```python ... ```). "
-    "When writing code, make it syntactically correct, internally consistent, "
-    "and ready to run without undefined or partially typed variables."
-=======
-    "Always respond in English, even if the user writes in another language."
->>>>>>> theirs
-=======
-    "Always respond in English, even if the user writes in another language."
->>>>>>> theirs
-=======
-    "Always respond in English, even if the user writes in another language."
->>>>>>> theirs
+    "with the appropriate language tag (for example ```python ... ```)."
 )
 
 
@@ -337,30 +323,6 @@ class HuggingFaceModelAdapter(IModelProvider):
         max_new_tokens = min(gen_max_tokens, MAX_NEW_TOKENS)
         return gen_temperature, max_new_tokens
 
-    @staticmethod
-    def _looks_like_code_request(user_input: str) -> bool:
-        """Heuristic to detect when the user is asking for code.
-
-        Used to slightly lower temperature for more deterministic,
-        syntactically stable outputs on code-heavy queries.
-        """
-        lowered = user_input.lower()
-        keywords = (
-            "code",
-            "snippet",
-            "function",
-            "class",
-            "implement",
-            "example",
-            "script",
-            "python",
-            "java",
-            "javascript",
-            "c++",
-            "c#",
-        )
-        return any(word in lowered for word in keywords)
-
     def generate_response(
         self,
         user_input: str,
@@ -394,13 +356,8 @@ class HuggingFaceModelAdapter(IModelProvider):
             attention_mask = attention_mask[:, -MAX_INPUT_LENGTH:]
             input_length = input_ids.shape[1]
 
-        # For code-related prompts, bias towards lower temperature for stability
-        effective_temperature = temperature
-        if temperature is None and self._looks_like_code_request(user_input):
-            effective_temperature = min(self._settings.TEMPERATURE, 0.25)
-
         gen_temperature, max_new_tokens = self._resolve_generation_params(
-            effective_temperature, max_tokens
+            temperature, max_tokens
         )
 
         with torch.no_grad():
@@ -469,13 +426,8 @@ class HuggingFaceModelAdapter(IModelProvider):
             attention_mask = attention_mask[:, -MAX_INPUT_LENGTH:]
             input_length = input_ids.shape[1]
 
-        # For code-related prompts, bias towards lower temperature for stability
-        effective_temperature = temperature
-        if temperature is None and self._looks_like_code_request(user_input):
-            effective_temperature = min(self._settings.TEMPERATURE, 0.25)
-
         gen_temperature, max_new_tokens = self._resolve_generation_params(
-            effective_temperature, max_tokens
+            temperature, max_tokens
         )
 
         # Create streamer for streaming output
