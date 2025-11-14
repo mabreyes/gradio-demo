@@ -77,24 +77,13 @@ class GradioChatInterface:
             Configured Gradio Blocks interface
         """
         with gr.Blocks(
-            title="Gradio Chat Interface", 
-            theme=gr.themes.Soft(),
-            css="""
-            .gradio-container {
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            }
-            .main-header {
-                text-align: center;
-                padding: 20px;
-            }
-            """
+            title="Gradio Chat Interface"
         ) as interface:
             # Header
             with gr.Column():
                 gr.Markdown(
-                    "# 🤖 Gradio Chat Interface with Hugging Face\n"
-                    "Chat with AI models powered by Hugging Face Transformers",
-                    elem_classes=["main-header"]
+                    "# Gradio Chat Interface with Hugging Face\n"
+                    "Chat with AI models powered by Hugging Face Transformers"
                 )
             
             # Main content area
@@ -126,7 +115,7 @@ class GradioChatInterface:
                 
                 # Right column - Settings and Info
                 with gr.Column(scale=1):
-                    with gr.Accordion("⚙️ Generation Parameters", open=False):
+                    with gr.Accordion("Generation Parameters", open=False):
                         temperature_slider = gr.Slider(
                             minimum=0.1,
                             maximum=2.0,
@@ -145,7 +134,7 @@ class GradioChatInterface:
                             info="Maximum length of generated response"
                         )
                     
-                    with gr.Accordion("ℹ️ Model Information", open=False):
+                    with gr.Accordion("Model Information", open=False):
                         model_info = gr.Markdown(
                             f"""
                             **Current Model:** `{settings.MODEL_NAME}`\n
@@ -154,11 +143,11 @@ class GradioChatInterface:
                             """
                         )
                     
-                    with gr.Accordion("📊 Statistics", open=False):
+                    with gr.Accordion("Statistics", open=False):
                         stats_display = gr.Markdown("**Conversation Stats:**\n- Messages: 0\n- Tokens: 0")
                     
                     # Example prompts
-                    with gr.Accordion("💡 Example Prompts", open=False):
+                    with gr.Accordion("Example Prompts", open=False):
                         example_btn1 = gr.Button("Example 1: General Question", size="sm", variant="secondary")
                         example_btn2 = gr.Button("Example 2: Creative Task", size="sm", variant="secondary")
                         example_btn3 = gr.Button("Example 3: Code Help", size="sm", variant="secondary")
