@@ -1,5 +1,7 @@
 """Gradio interface (Presentation Layer - user interface)."""
 
+import re
+import time
 from typing import Dict, Iterator, List, Optional, Tuple
 
 import gradio as gr
@@ -12,6 +14,8 @@ from domain.chat.interfaces import IModelProvider
 
 class GradioChatInterface:
     """Gradio chat interface following SRP - single responsibility for UI."""
+
+    _CODE_BLOCK_PATTERN = re.compile(r"```([^\n]*)\n(.*?)(```)", re.DOTALL)
 
     def __init__(
         self,
@@ -30,6 +34,42 @@ class GradioChatInterface:
         self.model_provider = model_provider
         self.settings = settings
         self.interface = None
+
+    @staticmethod
+    def _guess_code_language(code: str) -> str:
+        """Best-effort guess of code language for syntax highlighting."""
+        snippet = code.lower()
+        if "public class" in code or "system.out" in snippet or "static void main" in snippet:
+            return "java"
+        if "def " in snippet or "import " in snippet or "print(" in snippet:
+            return "python"
+        if "#include" in snippet or "int main(" in snippet:
+            return "cpp"
+        if "<?php" in snippet:
+            return "php"
+        if "console.log" in snippet or "document." in snippet or "function " in snippet:
+            return "javascript"
+        return ""
+
+    @classmethod
+    def _normalize_code_blocks(cls, text: str) -> str:
+        """Ensure fenced code blocks have a language for syntax highlighting."""
+
+        def _replace(match: re.Match) -> str:
+            lang = match.group(1).strip()
+            code = match.group(2)
+
+            # If language is already specified, keep as-is
+            if lang:
+                return match.group(0)
+
+            guessed = cls._guess_code_language(code)
+            if not guessed:
+                guessed = "text"
+
+            return f"```{guessed}\n{code}```"
+
+        return cls._CODE_BLOCK_PATTERN.sub(_replace, text)
 
     def _chat_function(
         self,
@@ -60,14 +100,29 @@ class GradioChatInterface:
         assistant_message = {"role": "assistant", "content": ""}
         updated_history = updated_history + [assistant_message]
 
-        # Stream response tokens
+        # Stream response tokens with a simple typewriter-style animation
         accumulated_response = ""
         for token in self.chat_service.send_message_stream(
             message, temperature=temperature, max_tokens=max_tokens
         ):
-            accumulated_response += token
-            # Update the assistant message in history
-            updated_history[-1] = {"role": "assistant", "content": accumulated_response}
+            for char in token:
+                accumulated_response += char
+                # Update the assistant message in history with a cursor-like indicator
+                updated_history[-1] = {
+                    "role": "assistant",
+                    "content": f"{accumulated_response}▌",
+                }
+                yield "", updated_history
+                # Small sleep to make the animation visible without slowing too much
+                time.sleep(0.01)
+
+        # Final update without the cursor once generation is complete
+        if updated_history and updated_history[-1]["role"] == "assistant":
+            normalized = self._normalize_code_blocks(accumulated_response)
+            updated_history[-1] = {
+                "role": "assistant",
+                "content": normalized,
+            }
             yield "", updated_history
 
     def _clear_history(self) -> Tuple[str, List[Dict[str, str]]]:
