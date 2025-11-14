@@ -22,7 +22,7 @@ ENV/
 
 # Model cache
 .cache/
-models/
+/models/
 *.bin
 *.safetensors
 
@@ -33,4 +33,3 @@ logs/
 # OS
 .DS_Store
 Thumbs.db
-
