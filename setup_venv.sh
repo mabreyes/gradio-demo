@@ -21,7 +21,9 @@ pip install --upgrade pip
 echo "Installing requirements..."
 pip install -r requirements.txt
 
+echo "Installing pre-commit hooks..."
+pre-commit install
+
 echo "Setup complete!"
 echo "To activate the virtual environment, run: source venv/bin/activate"
 echo "To run the application, run: python main.py"
-

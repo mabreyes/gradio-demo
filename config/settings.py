@@ -30,6 +30,8 @@ class Settings:
     GRADIO_SHARE: bool = os.getenv("GRADIO_SHARE", "False").lower() == "true"
 
     # Hugging Face configuration
+
+
 HF_TOKEN: Optional[str] = os.getenv("HF_TOKEN")
 USE_GPU: bool = os.getenv("USE_GPU", "False").lower() == "true"
 
