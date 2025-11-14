@@ -207,11 +207,29 @@ class GradioChatInterface:
             
             # Update stats when chat updates
             def update_stats(history):
+                """Compute a markdown summary of conversation statistics.
+
+                Args:
+                    history: Current chatbot history as a list of message
+                        dictionaries.
+
+                Returns:
+                    str: Markdown text with message count and estimated token
+                    usage.
+                """
                 message_count = len(history) if history else 0
                 # Rough token estimate (4 chars per token)
-                total_chars = sum(len(msg.get("content", "")) for msg in history) if history else 0
+                total_chars = (
+                    sum(len(msg.get("content", "")) for msg in history)
+                    if history
+                    else 0
+                )
                 estimated_tokens = total_chars // 4
-                return f"**Conversation Stats:**\n- Messages: {message_count}\n- Estimated Tokens: {estimated_tokens}"
+                return (
+                    "**Conversation Stats:**\n"
+                    f"- Messages: {message_count}\n"
+                    f"- Estimated Tokens: {estimated_tokens}"
+                )
             
             chatbot.change(
                 update_stats,
