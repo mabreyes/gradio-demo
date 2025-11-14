@@ -1,62 +1,41 @@
 # Gradio Chat Interface with Hugging Face
 
-A production-ready Gradio chat interface using Hugging Face models, following Pythonic/idiomatic SRP (Single Responsibility Principle), DDD (Domain-Driven Design), and DRY (Don't Repeat Yourself) principles.
+A Gradio-based chat interface for running Hugging Face text generation models. The focus of this project is on clean separation of layers and straightforward local or containerized setup.
 
-## Architecture
+## What the Application Does
 
-The project follows Domain-Driven Design (DDD) principles with clear separation of concerns:
-
-- **Domain Layer** (`domain/`): Core business entities and interfaces
-  - `domain/chat/entities.py`: Chat entities (ChatMessage, ChatHistory)
-  - `domain/chat/interfaces.py`: Domain interfaces (IModelProvider)
-
-- **Application Layer** (`application/`): Business logic and use cases
-  - `application/chat/chat_service.py`: Chat service orchestrating domain and infrastructure
-
-- **Infrastructure Layer** (`infrastructure/`): External adapters and implementations
-  - `infrastructure/models/huggingface_adapter.py`: Hugging Face model adapter
-
-- **Presentation Layer** (`presentation/`): User interface
-  - `presentation/gradio_interface.py`: Gradio interface
-
-- **Configuration** (`config/`): Application settings
-  - `config/settings.py`: Configuration management
-
-## Features
-
-- ✅ Clean architecture with DDD principles
-- ✅ Single Responsibility Principle (SRP) for each component
-- ✅ Dependency Inversion Principle (interfaces and abstractions)
-- ✅ DRY (Don't Repeat Yourself) - reusable components
-- ✅ Docker and Docker Compose support
-- ✅ Environment-based configuration
-- ✅ Type hints and proper error handling
+- Starts a Gradio web UI for chatting with a Hugging Face model.
+- Streams responses token-by-token so you see answers as they are generated.
+- Lets you adjust generation settings such as temperature and maximum response length from the UI.
+- Keeps a conversation history and allows you to clear it at any time.
 
 ## Prerequisites
 
-- Python 3.11 or higher
+- Python 3.11 or higher (for local development)
 - Docker and Docker Compose (for containerized deployment)
-- Hugging Face account (optional, for private models)
+- A Hugging Face account and token if you use private or gated models
 
-## Setup
+## Local Setup (Virtual Environment)
 
-### Option 1: Using Virtual Environment (Local Development)
+1. **Create and activate a virtual environment**
 
-1. **Create and activate virtual environment:**
    ```bash
    chmod +x setup_venv.sh
    ./setup_venv.sh
    source venv/bin/activate
    ```
 
-2. **Install dependencies:**
+2. **Install dependencies**
+
    ```bash
    pip install -r requirements.txt
    ```
 
-3. **Configure environment variables (optional):**
-   Create a `.env` file with the following variables:
-   ```
+3. **Configure environment variables**
+
+   Create a `.env` file in the project root (optional but recommended):
+
+   ```text
    MODEL_NAME=Qwen/Qwen2.5-0.5B-Instruct
    MAX_LENGTH=512
    TEMPERATURE=0.7
@@ -68,19 +47,23 @@ The project follows Domain-Driven Design (DDD) principles with clear separation 
    USE_GPU=False
    ```
 
-4. **Run the application:**
+4. **Run the application**
+
    ```bash
    python main.py
    ```
 
-5. **Access the interface:**
-   Open your browser and navigate to `http://localhost:7860`
+5. **Open the UI**
 
-### Option 2: Using Docker Compose
+   In your browser, go to `http://localhost:7860`.
 
-1. **Create environment file (optional):**
-   Create a `.env` file with the following variables:
-   ```
+## Setup with Docker Compose
+
+1. **Create a `.env` file**
+
+   In the project root, create a `.env` file (same variables as for local setup):
+
+   ```text
    MODEL_NAME=Qwen/Qwen2.5-0.5B-Instruct
    MAX_LENGTH=512
    TEMPERATURE=0.7
@@ -90,164 +73,121 @@ The project follows Domain-Driven Design (DDD) principles with clear separation 
    USE_GPU=False
    ```
 
-2. **Build and run with Docker Compose:**
+2. **Build and run**
+
    ```bash
    docker-compose up --build
    ```
 
-3. **Access the interface:**
-   Open your browser and navigate to `http://localhost:7860`
+3. **Open the UI**
 
-## Environment Variables
+   In your browser, go to `http://localhost:7860`.
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `MODEL_NAME` | Hugging Face model name/path | `Qwen/Qwen2.5-0.5B-Instruct` |
-| `MAX_LENGTH` | Maximum response length | `512` |
-| `TEMPERATURE` | Generation temperature | `0.7` |
-| `USE_CHAT_TEMPLATE` | Use chat template for modern models | `True` |
-| `GRADIO_SERVER_NAME` | Server hostname | `0.0.0.0` |
-| `GRADIO_SERVER_PORT` | Server port | `7860` |
-| `GRADIO_SHARE` | Create public Gradio link | `False` |
-| `HF_TOKEN` | Hugging Face API token | `None` |
-| `USE_GPU` | Use GPU for inference | `False` |
+## Using the Chat Interface
 
-## Available Models
+Once the UI is running:
 
-### Edge-Optimized Models (Recommended for Local/CPU)
+- Type your message into the text box at the bottom of the chat panel.
+- Click **Send** or press Enter to start generation.
+- Watch the assistant response stream into the chat window.
+- Adjust **Temperature** and **Max Tokens** in the right-hand panel:
+  - Temperature: higher values produce more varied responses.
+  - Max Tokens: caps the length of the generated answer (up to the configured limit).
+- Use **Clear Conversation** to reset the history.
+- Use the example prompt buttons to quickly populate the input field with sample questions.
 
-The default model is optimized for edge devices and local machines:
+## Configuration and Environment Variables
 
-**Recommended Models (sorted by size/performance):**
+The application is configured through environment variables, typically set in a `.env` file.
 
-1. **Qwen/Qwen2.5-0.5B-Instruct** (Default) - ~1GB
-   - Smallest and fastest
-   - Good for edge devices
-   - Excellent instruction following
-   - Best for: Quick responses, low memory
+| Variable              | Description                                       | Default                         |
+|-----------------------|---------------------------------------------------|---------------------------------|
+| `MODEL_NAME`          | Hugging Face model name or path                   | `Qwen/Qwen2.5-0.5B-Instruct`    |
+| `MAX_LENGTH`          | Maximum response length (tokens)                  | `512`                           |
+| `TEMPERATURE`         | Generation temperature                            | `0.7`                           |
+| `USE_CHAT_TEMPLATE`   | Use model-specific chat template if available     | `True`                          |
+| `GRADIO_SERVER_NAME`  | Server host name                                  | `0.0.0.0`                       |
+| `GRADIO_SERVER_PORT`  | Port for the Gradio server                        | `7860`                          |
+| `GRADIO_SHARE`        | Whether to create a Gradio public share link      | `False`                         |
+| `HF_TOKEN`            | Hugging Face API token                            | `None`                          |
+| `USE_GPU`             | Use GPU for inference if available                | `False`                         |
 
-2. **Qwen/Qwen2.5-1.5B-Instruct** - ~3GB
-   - Better quality than 0.5B
-   - Still very fast on CPU
-   - Best for: Better quality responses
+### Choosing a Model
 
-3. **TinyLlama/TinyLlama-1.1B-Chat-v1.0** - ~2.3GB
-   - Very fast chat model
-   - Optimized for conversations
-   - Best for: Conversational chat
+The app can work with many Hugging Face causal language models. For local or CPU-only setups, smaller instruction-tuned models are typically the most practical, such as:
 
-4. **microsoft/Phi-2** - ~5GB
-   - Excellent quality for size
-   - Very efficient
-   - Best for: High-quality responses
+- `Qwen/Qwen2.5-0.5B-Instruct` (default, small and fast)
+- `Qwen/Qwen2.5-1.5B-Instruct`
+- `TinyLlama/TinyLlama-1.1B-Chat-v1.0`
 
-5. **google/gemma-2b-it** - ~5GB
-   - Google's instruction-tuned model
-   - Good quality
-   - Best for: General purpose
+To change the model, set `MODEL_NAME` in your `.env` file or in the environment before running:
 
-### Legacy Models
-
-- `microsoft/DialoGPT-medium` - Older conversational model
-- `microsoft/DialoGPT-large` - Larger conversational model
-- `gpt2` - GPT-2 model
-
-### Changing Models
-
-To use a different model, set the `MODEL_NAME` environment variable:
-
-```bash
-# In .env file or docker-compose.yml
-MODEL_NAME=Qwen/Qwen2.5-1.5B-Instruct
-```
-
-Or export it before running:
 ```bash
 export MODEL_NAME=TinyLlama/TinyLlama-1.1B-Chat-v1.0
 python main.py
 ```
 
-### Model Features
+## Architecture and Project Layout
 
-- **Chat Template Support**: Modern instruction-tuned models (Qwen, Phi-2, Gemma) use chat templates for better formatting
-- **CPU Optimization**: Models are optimized for CPU inference with low memory usage
-- **Edge Device Support**: Small models work well on edge devices and local machines
+The codebase is organized into clear layers:
 
-## Project Structure
+- **Domain layer** (`domain/`): Core chat entities and interfaces.
+- **Application layer** (`application/`): Chat service orchestrating the conversation flow.
+- **Infrastructure layer** (`infrastructure/`): Hugging Face adapter and other external integrations.
+- **Presentation layer** (`presentation/`): Gradio UI.
+- **Configuration** (`config/`): Centralized settings.
 
-```
+Project structure:
+
+```text
 gradio-demo/
-├── domain/                   # Domain layer
+├── domain/
 │   └── chat/
-│       ├── entities.py       # Domain entities
-│       └── interfaces.py     # Domain interfaces
-├── application/              # Application layer
+│       ├── entities.py
+│       └── interfaces.py
+├── application/
 │   └── chat/
-│       └── chat_service.py   # Chat service
-├── infrastructure/           # Infrastructure layer
+│       └── chat_service.py
+├── infrastructure/
 │   └── models/
-│       └── huggingface_adapter.py  # Hugging Face adapter
-├── presentation/             # Presentation layer
-│   └── gradio_interface.py   # Gradio interface
-├── config/                   # Configuration
-│   └── settings.py           # Settings
-├── main.py                   # Entry point
-├── requirements.txt          # Python dependencies
-├── Dockerfile                # Docker image definition
-├── docker-compose.yml        # Docker Compose configuration
-├── setup_venv.sh             # Virtual environment setup script
-└── README.md                 # This file
+│       └── huggingface_adapter.py
+├── presentation/
+│   └── gradio_interface.py
+├── config/
+│   └── settings.py
+├── main.py
+├── requirements.txt
+├── Dockerfile
+├── docker-compose.yml
+├── setup_venv.sh
+└── README.md
 ```
-
-## Development
-
-### Running Tests
-
-```bash
-# Add your test files and run them
-pytest
-```
-
-### Code Quality
-
-The project follows Python best practices:
-- Type hints for all functions
-- Docstrings for all classes and methods
-- Clear separation of concerns
-- Dependency injection via interfaces
 
 ## Troubleshooting
 
-### Model Loading Issues
+### Model Loading
 
-If you encounter issues loading models:
-1. Check your internet connection (models are downloaded from Hugging Face)
-2. Verify the model name is correct
-3. If using a private model, ensure `HF_TOKEN` is set correctly
+- Check that `MODEL_NAME` is valid and available on Hugging Face.
+- Ensure you have network access when the model is downloaded the first time.
+- If the model is private or gated, verify that `HF_TOKEN` is set correctly.
 
-### Memory Issues
+### Memory Usage
 
-If you run out of memory:
-1. Use a smaller model (e.g., `microsoft/DialoGPT-small`)
-2. Reduce `MAX_LENGTH` in settings
-3. Use CPU instead of GPU (set `USE_GPU=False`)
+- Use a smaller model if you see out-of-memory errors.
+- Lower `MAX_LENGTH` to reduce response size.
+- Set `USE_GPU=False` if GPU memory is limited or unstable.
 
 ### Docker Issues
 
-If Docker build fails:
-1. Ensure Docker is running
-2. Check disk space
-3. Verify Docker Compose version (3.8+)
+- Ensure the Docker daemon is running.
+- Check that you have enough disk space.
+- Verify your Docker Compose version supports the provided configuration.
+
+## Development
+
+- Add tests and run them with `pytest` if you extend the project.
+- Keep changes aligned with the existing layering (domain, application, infrastructure, presentation) and configuration patterns.
 
 ## License
 
 This project is open source and available under the MIT License.
-
-## Contributing
-
-Contributions are welcome! Please follow the existing code structure and principles:
-- Follow SRP, DDD, and DRY principles
-- Add type hints and docstrings
-- Keep components focused and single-purpose
-- Maintain clear separation between layers
-
