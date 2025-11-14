@@ -1,0 +1,12 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    # See https://github.com/astral-sh/ruff-pre-commit for the latest version.
+    rev: v0.4.10
+    hooks:
+      # Sort imports using Ruff's isort-compatible rules.
+      - id: ruff
+        args: [--select, I, --fix]
+
+      # Apply Ruff's code formatter.
+      - id: ruff-format
+
