@@ -9,13 +9,16 @@ def main():
     print("Initializing model...")
     
     # Initialize model provider (Infrastructure layer)
-    model_provider = HuggingFaceModelAdapter()
+    model_provider = HuggingFaceModelAdapter(settings=settings)
     model_provider.initialize()
     
     print("Creating Gradio interface...")
     
     # Create Gradio interface (Presentation layer)
-    gradio_interface = create_gradio_interface(model_provider=model_provider)
+    gradio_interface = create_gradio_interface(
+        model_provider=model_provider,
+        settings=settings,
+    )
     
     print("Launching Gradio interface...")
     print(f"Server: {settings.GRADIO_SERVER_NAME}:{settings.GRADIO_SERVER_PORT}")
@@ -26,4 +29,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

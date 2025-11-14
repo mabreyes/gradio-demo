@@ -1,15 +1,22 @@
 """Gradio interface (Presentation Layer - user interface)."""
-import gradio as gr
 from typing import List, Dict, Tuple, Optional, Iterator
+
+import gradio as gr
+
 from application.chat.chat_service import ChatService
 from domain.chat.interfaces import IModelProvider
-from config.settings import settings
+from config.settings import Settings, settings as app_settings
 
 
 class GradioChatInterface:
     """Gradio chat interface following SRP - single responsibility for UI."""
     
-    def __init__(self, chat_service: ChatService, model_provider: Optional[IModelProvider] = None):
+    def __init__(
+        self,
+        chat_service: ChatService,
+        model_provider: Optional[IModelProvider] = None,
+        settings: Optional[Settings] = None,
+    ):
         """Initialize Gradio interface with chat service.
         
         Args:
@@ -18,6 +25,7 @@ class GradioChatInterface:
         """
         self.chat_service = chat_service
         self.model_provider = model_provider
+        self.settings = settings or app_settings
         self.interface = None
     
     def _chat_function(
@@ -119,7 +127,7 @@ class GradioChatInterface:
                         temperature_slider = gr.Slider(
                             minimum=0.1,
                             maximum=2.0,
-                            value=settings.TEMPERATURE,
+                            value=self.settings.TEMPERATURE,
                             step=0.1,
                             label="Temperature",
                             info="Higher = more creative, Lower = more focused"
@@ -128,7 +136,7 @@ class GradioChatInterface:
                         max_tokens_slider = gr.Slider(
                             minimum=50,
                             maximum=1024,
-                            value=min(settings.MAX_LENGTH, 256),
+                            value=min(self.settings.MAX_LENGTH, 256),
                             step=50,
                             label="Max Tokens",
                             info="Maximum length of generated response"
@@ -137,9 +145,9 @@ class GradioChatInterface:
                     with gr.Accordion("Model Information", open=False):
                         model_info = gr.Markdown(
                             f"""
-                            **Current Model:** `{settings.MODEL_NAME}`\n
+                            **Current Model:** `{self.settings.MODEL_NAME}`\n
                             **Device:** CPU\n
-                            **Chat Template:** {'Enabled' if settings.USE_CHAT_TEMPLATE else 'Disabled'}
+                            **Chat Template:** {'Enabled' if self.settings.USE_CHAT_TEMPLATE else 'Disabled'}
                             """
                         )
                     
@@ -225,21 +233,28 @@ class GradioChatInterface:
             self.interface = self.create_interface()
         
         self.interface.launch(
-            share=share if share is not None else settings.GRADIO_SHARE,
-            server_name=server_name or settings.GRADIO_SERVER_NAME,
-            server_port=server_port or settings.GRADIO_SERVER_PORT
+            share=share if share is not None else self.settings.GRADIO_SHARE,
+            server_name=server_name or self.settings.GRADIO_SERVER_NAME,
+            server_port=server_port or self.settings.GRADIO_SERVER_PORT
         )
 
 
-def create_gradio_interface(model_provider: IModelProvider) -> GradioChatInterface:
+def create_gradio_interface(
+    model_provider: IModelProvider,
+    settings: Optional[Settings] = None,
+) -> GradioChatInterface:
     """Factory function to create Gradio interface with dependencies.
     
     Args:
         model_provider: Model provider instance
+        settings: Application settings instance
         
     Returns:
         Configured Gradio interface
     """
     chat_service = ChatService(model_provider=model_provider)
-    return GradioChatInterface(chat_service=chat_service, model_provider=model_provider)
-
+    return GradioChatInterface(
+        chat_service=chat_service,
+        model_provider=model_provider,
+        settings=settings,
+    )
