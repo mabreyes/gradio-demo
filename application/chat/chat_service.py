@@ -1,6 +1,6 @@
 """Chat service (Application Layer - orchestrates domain and infrastructure)."""
 
-from typing import Iterator, List, Tuple
+from typing import Iterator, List, Optional, Tuple
 
 from domain.chat.entities import ChatHistory, ChatMessage
 from domain.chat.interfaces import IModelProvider
@@ -18,8 +18,16 @@ class ChatService:
         self.model_provider = model_provider
         self.chat_history = ChatHistory(messages=[])
 
+    def _add_user_message(self, user_input: str) -> None:
+        """Add a user message to the conversation history."""
+        user_message = ChatMessage(content=user_input, role="user")
+        self.chat_history.add_message(user_message)
+
     def send_message(
-        self, user_input: str, temperature: float = None, max_tokens: int = None
+        self,
+        user_input: str,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
     ) -> str:
         """Process user message and generate response.
 
@@ -31,9 +39,7 @@ class ChatService:
         Returns:
             Generated response from the model
         """
-        # Create user message
-        user_message = ChatMessage(content=user_input, role="user")
-        self.chat_history.add_message(user_message)
+        self._add_user_message(user_input)
 
         # Generate response using model provider
         response = self.model_provider.generate_response(
@@ -55,8 +61,8 @@ class ChatService:
         Returns:
             List of tuples (user_message, assistant_message)
         """
-        history = []
-        current_user = None
+        history: List[Tuple[str, str]] = []
+        current_user: Optional[str] = None
 
         for msg in self.chat_history.messages:
             if msg.role == "user":
@@ -68,7 +74,10 @@ class ChatService:
         return history
 
     def send_message_stream(
-        self, user_input: str, temperature: float = None, max_tokens: int = None
+        self,
+        user_input: str,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
     ) -> Iterator[str]:
         """Process user message and generate streaming response.
 
@@ -80,9 +89,7 @@ class ChatService:
         Yields:
             Generated response tokens/text as they're produced
         """
-        # Create user message
-        user_message = ChatMessage(content=user_input, role="user")
-        self.chat_history.add_message(user_message)
+        self._add_user_message(user_input)
 
         # Generate streaming response using model provider
         accumulated_response = ""

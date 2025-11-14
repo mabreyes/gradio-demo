@@ -17,25 +17,26 @@ class GradioChatInterface:
         self,
         chat_service: ChatService,
         model_provider: Optional[IModelProvider] = None,
-        settings: Optional[Settings] = None,
+        settings: Settings = app_settings,
     ):
         """Initialize Gradio interface with chat service.
 
         Args:
             chat_service: Chat service instance
             model_provider: Optional model provider for advanced features
+            settings: Application settings instance
         """
         self.chat_service = chat_service
         self.model_provider = model_provider
-        self.settings = settings or app_settings
+        self.settings = settings
         self.interface = None
 
     def _chat_function(
         self,
         message: str,
         history: List[Dict[str, str]],
-        temperature: float = None,
-        max_tokens: int = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
     ) -> Iterator[Tuple[str, List[Dict[str, str]]]]:
         """Handle chat message and update history with streaming.
 
@@ -69,7 +70,7 @@ class GradioChatInterface:
             updated_history[-1] = {"role": "assistant", "content": accumulated_response}
             yield "", updated_history
 
-    def _clear_history(self) -> Tuple[str, List]:
+    def _clear_history(self) -> Tuple[str, List[Dict[str, str]]]:
         """Clear conversation history.
 
         Returns:
@@ -145,7 +146,7 @@ class GradioChatInterface:
                         )
 
                     with gr.Accordion("Model Information", open=False):
-                        model_info = gr.Markdown(
+                        gr.Markdown(
                             f"""
                             **Current Model:** `{self.settings.MODEL_NAME}`\n
                             **Device:** CPU\n
@@ -240,7 +241,10 @@ class GradioChatInterface:
         return interface
 
     def launch(
-        self, share: bool = None, server_name: str = None, server_port: int = None
+        self,
+        share: Optional[bool] = None,
+        server_name: Optional[str] = None,
+        server_port: Optional[int] = None,
     ) -> None:
         """Launch the Gradio interface.
 
@@ -272,9 +276,10 @@ def create_gradio_interface(
     Returns:
         Configured Gradio interface
     """
+    configured_settings = settings or app_settings
     chat_service = ChatService(model_provider=model_provider)
     return GradioChatInterface(
         chat_service=chat_service,
         model_provider=model_provider,
-        settings=settings,
+        settings=configured_settings,
     )

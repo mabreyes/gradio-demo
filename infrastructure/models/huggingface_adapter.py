@@ -1,27 +1,32 @@
 """Hugging Face model adapter (Infrastructure Layer - implements domain interface)."""
-from typing import List, Iterator, Optional, Tuple
+from typing import Iterator, List, Optional, Tuple
 
 import logging
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, TextIteratorStreamer
 from threading import Thread
 
-from domain.chat.interfaces import IModelProvider
-from domain.chat.entities import ChatMessage
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer, TextIteratorStreamer
+
 from config.settings import Settings, settings as default_settings
+from domain.chat.entities import ChatMessage
+from domain.chat.interfaces import IModelProvider
 
 
 MAX_INPUT_LENGTH = 1024
 MAX_NEW_TOKENS = 256
 SPECIAL_TOKENS_TO_STRIP = ("<|endoftext|>", "<|im_end|>", "<|im_start|>")
 DEFAULT_EMPTY_RESPONSE = "I'm sorry, I couldn't generate a response. Please try again."
+ENGLISH_SYSTEM_PROMPT = (
+    "You are a helpful AI assistant. "
+    "Always respond in English, even if the user writes in another language."
+)
 
 
 class HuggingFaceModelAdapter(IModelProvider):
     """Hugging Face model adapter following SRP and DDD principles."""
 
     _logger = logging.getLogger(__name__)
-    
+
     def __init__(
         self,
         model_name: Optional[str] = None,
@@ -29,14 +34,14 @@ class HuggingFaceModelAdapter(IModelProvider):
         settings: Optional[Settings] = None,
     ):
         """Initialize the adapter with model configuration.
-        
+
         Args:
             model_name: Hugging Face model name/path
             device: Device to run the model on ('cuda' or 'cpu')
         """
         self._settings = settings or default_settings
         self.model_name = model_name or self._settings.MODEL_NAME
-        
+
         # Determine device
         if device:
             self.device = device
@@ -44,7 +49,7 @@ class HuggingFaceModelAdapter(IModelProvider):
             self.device = "cuda"
         else:
             self.device = "cpu"
-        
+
         self.tokenizer = None
         self.model = None
         self._initialized = False
@@ -210,6 +215,14 @@ class HuggingFaceModelAdapter(IModelProvider):
         """
         messages: List[dict] = []
 
+        # Always include an English-only system instruction
+        messages.append(
+            {
+                "role": "system",
+                "content": ENGLISH_SYSTEM_PROMPT,
+            }
+        )
+
         messages_to_process = self._get_messages_with_current_input(
             user_input, conversation_history
         )
@@ -227,13 +240,13 @@ class HuggingFaceModelAdapter(IModelProvider):
         conversation_history: List[ChatMessage],
     ) -> Tuple[torch.Tensor, torch.Tensor, int]:
         """Prepare input for model generation.
-        
+
         Supports both chat template (for instruction-tuned models) and legacy format.
-        
+
         Args:
             user_input: Current user input
             conversation_history: Previous messages
-            
+
         Returns:
             Tuple of (input_ids, attention_mask, input_length)
         """
@@ -242,21 +255,21 @@ class HuggingFaceModelAdapter(IModelProvider):
             messages = self._build_conversation_messages(
                 user_input, conversation_history
             )
-            
+
             # Apply chat template
             formatted_prompt = self.tokenizer.apply_chat_template(
                 messages,
                 tokenize=False,
-                add_generation_prompt=True
+                add_generation_prompt=True,
             )
-            
+
             # Tokenize the formatted prompt
             encoded = self.tokenizer(
                 formatted_prompt,
                 return_tensors="pt",
                 padding=False,
                 truncation=True,
-                max_length=2048
+                max_length=2048,
             )
             
             input_ids = encoded["input_ids"]
@@ -265,6 +278,14 @@ class HuggingFaceModelAdapter(IModelProvider):
         else:
             # Legacy format: build token sequence manually
             input_ids_list: List[int] = []
+
+            # Prepend English-only system instruction
+            system_ids = self.tokenizer.encode(
+                ENGLISH_SYSTEM_PROMPT,
+                add_special_tokens=False,
+            )
+            input_ids_list.extend(system_ids)
+            input_ids_list.append(self.tokenizer.eos_token_id)
 
             messages_to_process = self._get_messages_with_current_input(
                 user_input, conversation_history
@@ -275,46 +296,20 @@ class HuggingFaceModelAdapter(IModelProvider):
                 msg_ids = self.tokenizer.encode(msg.content, add_special_tokens=False)
                 input_ids_list.extend(msg_ids)
                 input_ids_list.append(self.tokenizer.eos_token_id)
-            
+
             # Convert to tensor
             input_ids = torch.tensor([input_ids_list], dtype=torch.long)
             attention_mask = torch.ones_like(input_ids)
             input_length = input_ids.shape[1]
-        
+
         return input_ids, attention_mask, input_length
-    
-    def generate_response(
-        self, 
-        user_input: str, 
-        conversation_history: List[ChatMessage],
-        temperature: float = None,
-        max_tokens: int = None
-    ) -> str:
-        """Generate a response using the Hugging Face model.
-        
-        Args:
-            user_input: The user's message
-            conversation_history: Previous messages in the conversation
-            
-        Returns:
-            Generated response text
-        """
-        if not self._initialized:
-            raise RuntimeError("Model not initialized. Call initialize() first.")
-        
-        # Prepare input (supports both chat template and legacy format)
-        input_ids, attention_mask, input_length = self._prepare_input_for_generation(user_input, conversation_history)
-        input_ids = input_ids.to(self.device)
-        attention_mask = attention_mask.to(self.device)
-        
-        # Truncate input if too long (most models have max context of 2048-4096)
-        if input_length > MAX_INPUT_LENGTH:
-            # Keep only the most recent conversation
-            input_ids = input_ids[:, -MAX_INPUT_LENGTH:]
-            attention_mask = attention_mask[:, -MAX_INPUT_LENGTH:]
-            input_length = input_ids.shape[1]
-        
-        # Use provided parameters or fall back to settings
+
+    def _resolve_generation_params(
+        self,
+        temperature: Optional[float],
+        max_tokens: Optional[int],
+    ) -> Tuple[float, int]:
+        """Resolve generation parameters with defaults and safety limits."""
         gen_temperature = (
             temperature
             if temperature is not None
@@ -323,10 +318,46 @@ class HuggingFaceModelAdapter(IModelProvider):
         gen_max_tokens = (
             max_tokens if max_tokens is not None else self._settings.MAX_LENGTH
         )
-        
-        # Generate response - use reasonable max_new_tokens for edge devices
         max_new_tokens = min(gen_max_tokens, MAX_NEW_TOKENS)
-        
+        return gen_temperature, max_new_tokens
+
+    def generate_response(
+        self,
+        user_input: str,
+        conversation_history: List[ChatMessage],
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+    ) -> str:
+        """Generate a response using the Hugging Face model.
+
+        Args:
+            user_input: The user's message
+            conversation_history: Previous messages in the conversation
+
+        Returns:
+            Generated response text
+        """
+        if not self._initialized:
+            raise RuntimeError("Model not initialized. Call initialize() first.")
+
+        # Prepare input (supports both chat template and legacy format)
+        input_ids, attention_mask, input_length = self._prepare_input_for_generation(
+            user_input, conversation_history
+        )
+        input_ids = input_ids.to(self.device)
+        attention_mask = attention_mask.to(self.device)
+
+        # Truncate input if too long (most models have max context of 2048-4096)
+        if input_length > MAX_INPUT_LENGTH:
+            # Keep only the most recent conversation
+            input_ids = input_ids[:, -MAX_INPUT_LENGTH:]
+            attention_mask = attention_mask[:, -MAX_INPUT_LENGTH:]
+            input_length = input_ids.shape[1]
+
+        gen_temperature, max_new_tokens = self._resolve_generation_params(
+            temperature, max_tokens
+        )
+
         with torch.no_grad():
             outputs = self.model.generate(
                 input_ids,
@@ -341,13 +372,13 @@ class HuggingFaceModelAdapter(IModelProvider):
                 repetition_penalty=1.2,
                 top_p=0.9,
                 top_k=50,
-                no_repeat_ngram_size=2
+                no_repeat_ngram_size=2,
             )
-        
+
         # Extract only the newly generated tokens (response)
         # Remove the input tokens, keep only the generated response
         generated_ids = outputs[0][input_length:]
-        
+
         # Decode and normalize only the generated response
         response = self._clean_response_text(
             self.tokenizer.decode(generated_ids, skip_special_tokens=True)
@@ -358,13 +389,13 @@ class HuggingFaceModelAdapter(IModelProvider):
             response = DEFAULT_EMPTY_RESPONSE
 
         return response
-    
+
     def generate_response_stream(
-        self, 
-        user_input: str, 
+        self,
+        user_input: str,
         conversation_history: List[ChatMessage],
-        temperature: float = None,
-        max_tokens: int = None
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
     ) -> Iterator[str]:
         """Generate a streaming response using the Hugging Face model.
         
@@ -379,37 +410,29 @@ class HuggingFaceModelAdapter(IModelProvider):
         """
         if not self._initialized:
             raise RuntimeError("Model not initialized. Call initialize() first.")
-        
+
         # Prepare input (supports both chat template and legacy format)
-        input_ids, attention_mask, input_length = self._prepare_input_for_generation(user_input, conversation_history)
+        input_ids, attention_mask, input_length = self._prepare_input_for_generation(
+            user_input, conversation_history
+        )
         input_ids = input_ids.to(self.device)
         attention_mask = attention_mask.to(self.device)
-        
+
         # Truncate input if too long
         if input_length > MAX_INPUT_LENGTH:
             input_ids = input_ids[:, -MAX_INPUT_LENGTH:]
             attention_mask = attention_mask[:, -MAX_INPUT_LENGTH:]
             input_length = input_ids.shape[1]
-        
-        # Use provided parameters or fall back to settings
-        gen_temperature = (
-            temperature
-            if temperature is not None
-            else self._settings.TEMPERATURE
+
+        gen_temperature, max_new_tokens = self._resolve_generation_params(
+            temperature, max_tokens
         )
-        gen_max_tokens = (
-            max_tokens if max_tokens is not None else self._settings.MAX_LENGTH
-        )
-        max_new_tokens = min(gen_max_tokens, MAX_NEW_TOKENS)
-        
+
         # Create streamer for streaming output
         streamer = TextIteratorStreamer(
-            self.tokenizer,
-            skip_prompt=True,
-            skip_special_tokens=True,
-            timeout=60.0
+            self.tokenizer, skip_prompt=True, skip_special_tokens=True, timeout=60.0
         )
-        
+
         # Generation parameters
         generation_kwargs = {
             "input_ids": input_ids,
@@ -430,9 +453,7 @@ class HuggingFaceModelAdapter(IModelProvider):
         
         # Start generation in a separate thread
         generation_thread = Thread(
-            target=self.model.generate,
-            kwargs=generation_kwargs,
-            daemon=True
+            target=self.model.generate, kwargs=generation_kwargs, daemon=True
         )
         generation_thread.start()
         

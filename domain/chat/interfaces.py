@@ -1,7 +1,7 @@
 """Chat domain interfaces following DDD principles - dependency inversion."""
 
 from abc import ABC, abstractmethod
-from typing import Iterator, List
+from typing import Iterator, List, Optional
 
 from domain.chat.entities import ChatMessage
 
@@ -14,8 +14,8 @@ class IModelProvider(ABC):
         self,
         user_input: str,
         conversation_history: List[ChatMessage],
-        temperature: float = None,
-        max_tokens: int = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
     ) -> str:
         """Generate a response based on user input and conversation history.
 
@@ -35,8 +35,8 @@ class IModelProvider(ABC):
         self,
         user_input: str,
         conversation_history: List[ChatMessage],
-        temperature: float = None,
-        max_tokens: int = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
     ) -> Iterator[str]:
         """Generate a streaming response based on user input and conversation history.
 
