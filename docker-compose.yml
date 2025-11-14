@@ -1,0 +1,32 @@
+services:
+  gradio-chat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gradio-chat-app
+    ports:
+      - "7860:7860"
+    environment:
+      - MODEL_NAME=${MODEL_NAME:-Qwen/Qwen2.5-0.5B-Instruct}
+      - MAX_LENGTH=${MAX_LENGTH:-128}
+      - MAX_INPUT_LENGTH=${MAX_INPUT_LENGTH:-512}
+      - TEMPERATURE=${TEMPERATURE:-0.7}
+      - USE_CHAT_TEMPLATE=${USE_CHAT_TEMPLATE:-True}
+      - USE_QUANTIZATION=${USE_QUANTIZATION:-True}
+      - USE_GREEDY_DECODING=${USE_GREEDY_DECODING:-False}
+      - GRADIO_SERVER_NAME=0.0.0.0
+      - GRADIO_SERVER_PORT=7860
+      - GRADIO_SHARE=${GRADIO_SHARE:-False}
+      - HF_TOKEN=${HF_TOKEN:-}
+      - USE_GPU=${USE_GPU:-False}
+    volumes:
+      # Mount cache directory to persist model downloads
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7860"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
