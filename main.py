@@ -6,7 +6,6 @@ from config.settings import settings
 from infrastructure.models.huggingface_adapter import HuggingFaceModelAdapter
 from presentation.gradio_interface import create_gradio_interface
 
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",

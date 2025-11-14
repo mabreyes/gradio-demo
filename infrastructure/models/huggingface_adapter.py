@@ -1,16 +1,16 @@
 """Hugging Face model adapter (Infrastructure Layer - implements domain interface)."""
-from typing import Iterator, List, Optional, Tuple
 
 import logging
 from threading import Thread
+from typing import Iterator, List, Optional, Tuple
 
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, TextIteratorStreamer
 
-from config.settings import Settings, settings as default_settings
+from config.settings import Settings
+from config.settings import settings as default_settings
 from domain.chat.entities import ChatMessage
 from domain.chat.interfaces import IModelProvider
-
 
 MAX_INPUT_LENGTH = 1024
 MAX_NEW_TOKENS = 256
@@ -56,7 +56,7 @@ class HuggingFaceModelAdapter(IModelProvider):
         self.model = None
         self._initialized = False
         self.use_chat_template = self._settings.USE_CHAT_TEMPLATE
-    
+
     def initialize(self) -> None:
         """Initialize the model and tokenizer (Infrastructure concern)."""
         if self._initialized:
@@ -64,16 +64,19 @@ class HuggingFaceModelAdapter(IModelProvider):
 
         self._logger.info("Loading model: %s", self.model_name)
         self._logger.info("Using device: %s", self.device)
-        
+
         # Load tokenizer and model
         self.tokenizer = AutoTokenizer.from_pretrained(
             self.model_name,
             token=self._settings.HF_TOKEN,
-            trust_remote_code=True  # Allow custom tokenizers for some models
+            trust_remote_code=True,  # Allow custom tokenizers for some models
         )
-        
+
         # Check if tokenizer has chat template (for instruction-tuned models)
-        has_chat_template = hasattr(self.tokenizer, "apply_chat_template") and self.tokenizer.chat_template is not None
+        has_chat_template = (
+            hasattr(self.tokenizer, "apply_chat_template")
+            and self.tokenizer.chat_template is not None
+        )
         if has_chat_template:
             self._logger.info("Chat template available: %s", self.use_chat_template)
             # Use chat template if available and enabled
@@ -84,7 +87,7 @@ class HuggingFaceModelAdapter(IModelProvider):
         else:
             self._logger.info("No chat template found, using legacy format")
             self.use_chat_template = False
-        
+
         # Add pad token if it doesn't exist
         if self.tokenizer.pad_token is None:
             if self.tokenizer.eos_token is not None:
@@ -96,12 +99,15 @@ class HuggingFaceModelAdapter(IModelProvider):
             else:
                 # Add a new pad token
                 self.tokenizer.add_special_tokens({"pad_token": "[PAD]"})
-        
+
         # Use a different pad token if pad_token_id equals eos_token_id to avoid attention mask issues
-        if self.tokenizer.pad_token_id == self.tokenizer.eos_token_id and self.tokenizer.unk_token_id is not None:
+        if (
+            self.tokenizer.pad_token_id == self.tokenizer.eos_token_id
+            and self.tokenizer.unk_token_id is not None
+        ):
             self.tokenizer.pad_token_id = self.tokenizer.unk_token_id
             self.tokenizer.pad_token = self.tokenizer.unk_token
-        
+
         # Load model with appropriate settings for edge devices
         # Use dtype instead of torch_dtype (torch_dtype is deprecated)
         model_kwargs = {
@@ -110,20 +116,19 @@ class HuggingFaceModelAdapter(IModelProvider):
             "dtype": torch.float32 if self.device == "cpu" else torch.float16,
             "low_cpu_mem_usage": True,  # Optimize for low memory
         }
-        
+
         self.model = AutoModelForCausalLM.from_pretrained(
-            self.model_name,
-            **model_kwargs
+            self.model_name, **model_kwargs
         )
-        
+
         # Resize token embeddings if we added a new pad token
         if len(self.tokenizer) > self.model.config.vocab_size:
             self.model.resize_token_embeddings(len(self.tokenizer))
-        
+
         # Move to device
         self.model.to(self.device)
         self.model.eval()
-        
+
         # Enable optimizations for CPU inference
         if self.device == "cpu":
             # Use torch.compile for faster inference (PyTorch 2.0+)
@@ -204,14 +209,16 @@ class HuggingFaceModelAdapter(IModelProvider):
             cleaned = cleaned.split("\n", 1)[-1].split(":", 1)[-1].strip()
 
         return cleaned
-    
-    def _build_conversation_messages(self, user_input: str, conversation_history: List[ChatMessage]) -> List[dict]:
+
+    def _build_conversation_messages(
+        self, user_input: str, conversation_history: List[ChatMessage]
+    ) -> List[dict]:
         """Build conversation messages in format expected by chat template.
-        
+
         Args:
             user_input: Current user input
             conversation_history: Previous messages (may include the current user message)
-            
+
         Returns:
             List of message dictionaries with 'role' and 'content' keys
         """
@@ -235,7 +242,7 @@ class HuggingFaceModelAdapter(IModelProvider):
             messages.append({"role": role, "content": msg.content})
 
         return messages
-    
+
     def _prepare_input_for_generation(
         self,
         user_input: str,
@@ -273,7 +280,7 @@ class HuggingFaceModelAdapter(IModelProvider):
                 truncation=True,
                 max_length=2048,
             )
-            
+
             input_ids = encoded["input_ids"]
             attention_mask = encoded.get("attention_mask", torch.ones_like(input_ids))
             input_length = input_ids.shape[1]
@@ -313,9 +320,7 @@ class HuggingFaceModelAdapter(IModelProvider):
     ) -> Tuple[float, int]:
         """Resolve generation parameters with defaults and safety limits."""
         gen_temperature = (
-            temperature
-            if temperature is not None
-            else self._settings.TEMPERATURE
+            temperature if temperature is not None else self._settings.TEMPERATURE
         )
         gen_max_tokens = (
             max_tokens if max_tokens is not None else self._settings.MAX_LENGTH
@@ -400,13 +405,13 @@ class HuggingFaceModelAdapter(IModelProvider):
         max_tokens: Optional[int] = None,
     ) -> Iterator[str]:
         """Generate a streaming response using the Hugging Face model.
-        
+
         Args:
             user_input: The user's message
             conversation_history: Previous messages in the conversation
             temperature: Optional temperature override
             max_tokens: Optional max tokens override
-            
+
         Yields:
             Generated response tokens/text as they're produced
         """
@@ -450,15 +455,15 @@ class HuggingFaceModelAdapter(IModelProvider):
             "top_p": 0.9,
             "top_k": 50,
             "no_repeat_ngram_size": 2,
-            "streamer": streamer
+            "streamer": streamer,
         }
-        
+
         # Start generation in a separate thread
         generation_thread = Thread(
             target=self.model.generate, kwargs=generation_kwargs, daemon=True
         )
         generation_thread.start()
-        
+
         # Yield tokens as they're generated
         accumulated_text = ""
         for new_text in streamer:
@@ -468,7 +473,7 @@ class HuggingFaceModelAdapter(IModelProvider):
                 clean_text = self._strip_special_tokens(new_text)
                 if clean_text.strip():
                     yield clean_text
-        
+
         # Final cleanup
         if accumulated_text:
             final_text = self._clean_response_text(accumulated_text)
